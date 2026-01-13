@@ -188,10 +188,10 @@ def show_portfolio(user_id, username, base_currency='USD'):
 
 #покупаем валюту
 @log_action()
-def buy_currency(user_id, currency_to_buy, amount):
+def buy_currency(user_id, currency_code, amount):
 
     #смотрим валюту через наше хранилище
-    currency_obj = get_currency(currency_to_buy)
+    currency_obj = get_currency(currency_code)
     
     try:
         amount = float(amount)
@@ -243,143 +243,92 @@ def buy_currency(user_id, currency_to_buy, amount):
     
 #продаем валюту
 @log_action()
-def sell_currency(user_id, currency_to_sell, amount):
+def sell_currency(user_id, currency_code, amount):
 
-    #теперь получаем пути не из констант
-    #как было раньше
-    data_path = settings_loader.get("data_path", "data")
-    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
-    rates_filename = settings_loader.get("rates_filename", "rates.json")
-    portfolios_file_path = os.path.join(data_path, portfolios_filename)
-    rates_file_path = os.path.join(data_path, rates_filename)
-
-    #приводим к унифицированному виду валюту
-    currency_to_sell = currency_to_sell.upper()
+    #смотрим валюту через наше хранилище
+    currency_obj = get_currency(currency_code)
     
     try:
         amount = float(amount)
-        if amount <= 0:
-            return 'Ошибка: "amount" должен быть положительным числом'
+        if amount <= 0: raise ValueError
     except (ValueError, TypeError):
-        return 'Ошибка: "amount" должен быть числом'
+        raise ValueError('"amount" должен быть положительным числом')
 
-    #читаем данные
+    #получаем пути
+    data_path = settings_loader.get('data_path', 'data')
+    portfolios_file_path = os.path.join(data_path, settings_loader.get('portfolios_filename'))
     portfolios = read_json(portfolios_file_path)
-    rates_data = read_json(rates_file_path, default_data={})
 
-    #получаем курсы валют
-    exchange_rates = { 'USD': 1.0 }
-    for key, value in rates_data.get('rates', {}).items():
-        currency_code = key.split('_')[0]
-        exchange_rates[currency_code] = value['rate']
+    #ищем портфель
+    user_portfolio_dict = next((p for p in portfolios if p.get('user_id') == user_id), None)
+    if not user_portfolio_dict:
+        raise 'ошибка: портфель пользователя не найден.'
+
+    portfolio_obj = Portfolio(user_id, user_portfolio_dict['wallets'])
     
-    current_rate = exchange_rates.get(currency_to_sell)
-    
-    #добавляем исключение
-    if not current_rate:
-        raise ApiRequestError(f'Не удалось получить курс для {currency_code_to_sell} → USD')
-
-
-    user_portfolio = None
-    portfolio_index = -1
-    for i, p in enumerate(portfolios):
-        if p['user_id'] == user_id:
-            user_portfolio = p
-            portfolio_index = i
-            break
-            
-    #проверяем наличие портфеля       
-    if not user_portfolio:
-        return 'ошибка: портфель пользователя не найден.'
-
-    #проверяем, существует ли кошелек
-    if currency_to_sell not in user_portfolio['wallets']:
-        return f'Ошибка: У вас нет кошелька "{currency_to_sell}". Вы не можете продать то, чего у вас нет.'
+    wallet_to_sell = portfolio_obj.get_wallet(currency_obj.code)
+    if not wallet_to_sell:
+        raise f'У вас нет кошелька "{currency_obj.code}".'
         
-    current_balance = user_portfolio['wallets'][currency_to_sell].get('balance', 0.0)
-    
-    #проверка на достаточность средств
-    #добавляем исключение
-    if amount > current_balance:
-        return InsufficientFundsError(
-            available=current_balance,
-            required=amount,
-            code=currency_code_to_sell
-        )
+    wallet_to_sell.withdraw(amount)
 
-    #обновляем балансы
-    new_balance = current_balance - amount
-    user_portfolio['wallets'][currency_to_sell]['balance'] = new_balance
-    
-    revenue_in_usd = amount * current_rate
-    usd_balance = user_portfolio['wallets'].get('USD', {'balance': 0.0}).get('balance', 0.0)
-    user_portfolio['wallets']['USD'] = {'balance': usd_balance + revenue_in_usd}
-    
-    #сохраняем
-    portfolios[portfolio_index] = user_portfolio
+    #сохраняем и выводим
+    portfolio_index = portfolios.index(user_portfolio_dict)
+    updated_wallets_dict = {code: {'balance': wallet.balance} for code, wallet in portfolio_obj.wallets.items()}
+    portfolios[portfolio_index]['wallets'] = updated_wallets_dict
     write_json(portfolios_file_path, portfolios)
+
+    return f'Продажа {amount:,.4f} {currency_obj.code} прошла успешно.'
     
-    #выводим
+
+#получаем курсы по обмену валют
+def get_exchange_rate(from_code, to_code):
+
+    #смотрим валюту через наше хранилище
+    from_curr_obj = get_currency(from_code)
+    to_curr_obj = get_currency(to_code)
+
+    #если одинаковые
+    if from_curr_obj.code == to_curr_obj.code:
+        return f'Курс {from_curr_obj.code}→{to_curr_obj.code}: 1.0'
+
+    #получаем пути
+    data_path = settings_loader.get('data_path', 'data')
+    rates_file_path = os.path.join(data_path, settings_loader.get('rates_filename'))
+    rates_ttl_seconds = settings_loader.get('rates_ttl_seconds', 300)
+
+    #проверяем "свежесть" кэша
+    #(прошло ли 300 сек)
+    rates_data = read_json(rates_file_path, default_data={})
+    last_refresh_str = rates_data.get('last_refresh')
+    
+    if last_refresh_str:
+        last_refresh_dt = datetime.fromisoformat(last_refresh_str)
+        
+        #если кэш устарел
+        if datetime.now() - last_refresh_dt > timedelta(seconds=rates_ttl_seconds):
+            raise ApiRequestError('Данные о курсах устарели, не удалось обновить.')
+    
+    #кросс-курс
+    exchange_rates_to_usd = {'USD': 1.0}
+    for key, value in rates_data.get('rates', {}).items():
+        exchange_rates_to_usd[key.split('_')[0]] = value['rate']
+        
+    from_rate = exchange_rates_to_usd.get(from_curr_obj.code)
+    to_rate = exchange_rates_to_usd.get(to_curr_obj.code)
+
+    if from_rate is None or to_rate is None:
+        raise ApiRequestError(f'Недостаточно данных для расчета курса {from_code}->{to_code}')
+
+    final_rate = from_rate / to_rate
+    reverse_rate = to_rate / from_rate
+    
+    #вывод
     report = (
-        f"Продажа выполнена: {amount:,.4f} {currency_to_sell} по курсу {current_rate:,.2f} USD/{currency_to_sell}\n"
-        f"Изменения в портфеле:\n"
-        f"- {currency_to_sell}: было {current_balance:,.4f} → стало {new_balance:,.4f}\n"
-        f"Оценочная выручка: {revenue_in_usd:,.2f} USD (зачислено на USD кошелек)"
+        f"Курс {from_curr_obj.code}→{to_curr_obj.code}: {final_rate:,.8f} (обновлено: {last_refresh_str})\n"
+        f"Обратный курс {to_curr_obj.code}→{from_curr_obj.code}: {reverse_rate:,.2f}"
     )
     
     return report
     
-
-#получаем курсы по обмену валют
-def get_exchange_rate(from_currency, to_currency):
-
-    #теперь получаем пути не из констант
-    #как было раньше
-    data_path = settings_loader.get("data_path", "data")
-    rates_filename = settings_loader.get("rates_filename", "rates.json")
-    rates_file_path = os.path.join(data_path, rates_filename)
-
-    from_currency = from_currency.upper()
-    to_currency = to_currency.upper()
     
-    if from_currency == to_currency:
-        return f'Курс {from_currency}→{to_currency}: 1.0'
-
-    #читаем данные
-    rates_data = read_json(rates_file_path, default_data={})
-    
-    #создаем словарь по отношению к доллару
-    exchange_rates_to_usd = {'USD': 1.0}
-    for key, value in rates_data.get('rates', {}).items():
-        currency_code = key.split('_')[0]
-        exchange_rates_to_usd[currency_code] = value['rate']
-
-    #проверяем, есть ли такой курс в словаре
-    if from_currency not in exchange_rates_to_usd:
-        # Если курса нет, выбрасываем ошибку, как будто API его не предоставил.
-        raise ApiRequestError(f"Курс для '{from_currency}' недоступен.")
-    if to_currency not in exchange_rates_to_usd:
-        raise ApiRequestError(f"Курс для '{to_currency}' недоступен.")
-        
-        
-    #рассчитываем "перекрестные" курсы (или как их назвать..)    
-    from_rate_vs_usd = exchange_rates_to_usd[from_currency]
-    to_rate_vs_usd = exchange_rates_to_usd[to_currency]
-    final_rate = from_rate_vs_usd / to_rate_vs_usd
-    reverse_rate = to_rate_vs_usd / from_rate_vs_usd
-
-    #реализуем время обновления
-    last_update_str = rates_data.get('last_refresh', 'N/A')
-    try:
-        last_update_dt = datetime.fromisoformat(last_update_str)
-        formatted_time = last_update_dt.strftime('%Y-%m-%d %H:%M:%S')
-    except (ValueError, TypeError):
-        formatted_time = 'неизвестно'
-        
-    #выводим
-    report = (
-        f"Курс {from_currency}→{to_currency}: {final_rate:,.8f} (обновлено: {formatted_time})\n"
-        f"Обратный курс {to_currency}→{from_currency}: {reverse_rate:,.2f}"
-    )
-    
-    return report 
