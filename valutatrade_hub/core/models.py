@@ -2,6 +2,10 @@
 import hashlib
 from datetime import datetime
 
+#импортируем сделанные исключения
+from .exceptions import InsufficientFundsError, CurrencyNotFoundError
+
+
 #создаем класс 'пользователь системы'
 class User:
     def __init__(self, user_id, username, hashed_password, salt, registration_date):
@@ -123,9 +127,14 @@ class Wallet:
             raise ValueError('Сумма снятия должна быть положительной.')
         
         #проверяем, есть ли на счету средства для снятия
+        #используем сделанное исключение
         if amount > self.balance:
-            raise ValueError(f'Недостаточно средств. На счете {self.currency_code} всего {self.balance}.')
-            
+            raise InsufficientFundsError(
+                available=self.balance, 
+                required=amount, 
+                code=self.currency_code
+            )     
+                
         self._balance -= amount
         print(f'Со счета {self.currency_code} списано {amount}. Новый баланс: {self.balance}')
     

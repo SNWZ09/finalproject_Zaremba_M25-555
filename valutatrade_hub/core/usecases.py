@@ -6,6 +6,9 @@ from datetime import datetime
 #импортируем ранее созданные функции и константы
 from .utils import read_json, write_json, USERS_FILE_PATH, PORTFOLIOS_FILE_PATH, RATES_FILE_PATH
 
+#импортируем сделанные исключения
+from .exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
+
 #регистрация пользователя
 def register_user(username, password):
 
@@ -236,13 +239,13 @@ def sell_currency(user_id, currency_to_sell, amount):
     
     current_rate = exchange_rates.get(currency_to_sell)
     
-    #
+    #добавляем исключение
     if not current_rate:
-        return f'Ошибка: Не удалось получить курс для {currency_to_sell} → USD'
+        raise ApiRequestError(f'Не удалось получить курс для {currency_code_to_sell} → USD')
 
-    # --- 4. Поиск и обновление портфеля ---
+
     user_portfolio = None
-    portfolio_index = -1 # Сохраним индекс портфеля, чтобы потом обновить его в списке
+    portfolio_index = -1
     for i, p in enumerate(portfolios):
         if p['user_id'] == user_id:
             user_portfolio = p
@@ -260,8 +263,13 @@ def sell_currency(user_id, currency_to_sell, amount):
     current_balance = user_portfolio['wallets'][currency_to_sell].get('balance', 0.0)
     
     #проверка на достаточность средств
+    #добавляем исключение
     if amount > current_balance:
-        return f'Ошибка: Недостаточно средств. Доступно {current_balance:,.4f} {currency_to_sell}, требуется {amount:,.4f} {currency_to_sell}'
+        return InsufficientFundsError(
+            available=current_balance,
+            required=amount,
+            code=currency_code_to_sell
+        )
 
     #обновляем балансы
     new_balance = current_balance - amount
@@ -289,27 +297,8 @@ def sell_currency(user_id, currency_to_sell, amount):
 #получаем курсы по обмену валют
 def get_exchange_rate(from_currency, to_currency):
 
-    from_currency = from_currency.upper()
-    to_currency = to_currency.upper()
-
-    #если валюты одинаковые
-    if from_currency == to_currency:
-        return f'Курс {from_currency}→{to_currency}: 1.0'
-
-    #читаем данные
-    rates_data = read_json(RATES_FILE_PATH, default_data={})
-    
-    #создаем словарь
-    exchange_rates_to_usd = { 'USD': 1.0 }
-    for key, value in rates_data.get('rates', {}).items():
-        currency_code = key.split('_')[0]
-        exchange_rates_to_usd[currency_code] = value['rate']
-
-    #проверяем, точно ли есть курсы
-    if from_currency not in exchange_rates_to_usd:
-        return f'Ошибка: Курс для "{from_currency}" недоступен. Повторите попытку позже.'
-    if to_currency not in exchange_rates_to_usd:
-        return f'Ошибка: Курс для "{to_currency}" недоступен. Повторите попытку позже.'
+    from_curr_obj = get_currency(from_currency)
+    to_curr_obj = get_currency(to_currency)
         
     #рассчитываем "перекрестные" курсы (или как их назвать..)    
     from_rate_vs_usd = exchange_rates_to_usd[from_currency]
@@ -331,4 +320,4 @@ def get_exchange_rate(from_currency, to_currency):
         f"Обратный курс {to_currency}→{from_currency}: {reverse_rate:,.2f}"
     )
     
-    return report
+    return report 
