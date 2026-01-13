@@ -1,0 +1,14 @@
+[
+    {
+        "user_id": 1,
+        "wallets": {}
+    },
+    {
+        "user_id": 2,
+        "wallets": {
+            "USD": {
+                "balance": 1.0
+            }
+        }
+    }
+]
