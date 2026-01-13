@@ -13,5 +13,16 @@
                 "balance": 0.0
             }
         }
+    },
+    {
+        "user_id": 3,
+        "wallets": {
+            "USD": {
+                "balance": 90.0
+            },
+            "BTC": {
+                "balance": 1.0
+            }
+        }
     }
 ]

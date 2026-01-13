@@ -12,5 +12,12 @@
         "hashed_password": "1239829a9d5c2cef7cedfc4e23b3ef6878bfe8b2005288b9611805664cf38373",
         "salt": "1768326592.426858",
         "registration_date": "2026-01-13T20:49:52.426889"
+    },
+    {
+        "user_id": 3,
+        "username": "Heavylight",
+        "hashed_password": "0a5e162ba6bd0ce884abc41ebea12472fa196e5caf5940feb5df475c279917f1",
+        "salt": "1768344244.0100126",
+        "registration_date": "2026-01-14T01:44:04.010040"
     }
 ]
