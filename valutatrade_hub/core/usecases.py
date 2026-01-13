@@ -1,23 +1,19 @@
 import hashlib
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+
+#импорт декоратора
+from valutatrade_hub.decorators import log_action
 
 #импорт SettingsLoader
 from valutatrade_hub.infra.settings import settings_loader
 
-#импорт декоратора
-from valutatrade_hub.decorators import log_action
+from .currencies import get_currency
+from .exceptions import ApiRequestError
+from .models import Portfolio
 from .utils import read_json, write_json
 
-from .currencies import get_currency
-from .models import Portfolio
-
-from .exceptions import (
-    InsufficientFundsError,
-    CurrencyNotFoundError,
-    ApiRequestError
-)
 
 #регистрация пользователя
 @log_action()
@@ -77,7 +73,7 @@ def register_user(username, password):
     write_json(portfolios_file_path, portfolios)
 
     #возвращаем сообщение о том, что всё получилось
-    return f'Пользователь "{username}" зарегистрирован (id={new_user_id}). Войдите: login --username {username} --password ****'
+    return f'"{username}" зарегистрирован (id={new_user_id}). Войдите: login --username {username} --password ****'
 
 #вход пользователя
 @log_action()
@@ -250,7 +246,8 @@ def sell_currency(user_id, currency_code, amount):
     
     try:
         amount = float(amount)
-        if amount <= 0: raise ValueError
+        if amount <= 0:
+            raise ValueError
     except (ValueError, TypeError):
         raise ValueError('"amount" должен быть положительным числом')
 

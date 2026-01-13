@@ -3,7 +3,7 @@ import hashlib
 from datetime import datetime
 
 #импортируем сделанные исключения
-from .exceptions import InsufficientFundsError, CurrencyNotFoundError
+from .exceptions import InsufficientFundsError
 
 
 #создаем класс 'пользователь системы'

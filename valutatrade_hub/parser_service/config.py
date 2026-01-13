@@ -1,6 +1,6 @@
 import os
-from dataclasses import dataclass, field
-from typing import Tuple, Dict
+from dataclasses import dataclass
+from typing import Tuple
 
 #получаем ключ из файла на компьютере
 #тк нельзя, чтобы он был в коде/на гитхабе

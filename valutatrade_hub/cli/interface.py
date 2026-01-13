@@ -1,22 +1,25 @@
-import shlex
-
 #импорт логгера
 import logging
+import shlex
 
 #импортируем нашу функцию с бизнес-логикой
-from valutatrade_hub.core.usecases import(
-    register_user, 
-    login_user, 
-    show_portfolio, 
-    buy_currency, 
-    sell_currency, 
-    get_exchange_rate
+from valutatrade_hub.core.usecases import (
+    buy_currency,
+    get_exchange_rate,
+    login_user,
+    register_user,
+    sell_currency,
+    show_portfolio,
 )
-
 from valutatrade_hub.logging_config import setup_logging
 
 #импортируем сделанные исключения
-from ..core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
+from ..core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
+
 
 def main():
 

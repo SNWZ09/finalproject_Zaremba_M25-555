@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 #импорт исключения
 from .exceptions import CurrencyNotFoundError
 
+
 class Currency(ABC):
     def __init__(self, name: str, code: str):
         if not isinstance(name, str) or not name:

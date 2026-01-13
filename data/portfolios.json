@@ -24,5 +24,13 @@
                 "balance": 1.0
             }
         }
+    },
+    {
+        "user_id": 4,
+        "wallets": {
+            "USD": {
+                "balance": 0.0
+            }
+        }
     }
 ]

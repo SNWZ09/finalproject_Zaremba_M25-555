@@ -1,8 +1,8 @@
 #создаем декоратор, который и будет использовать логгер
 
+import inspect
 import logging
 from functools import wraps
-import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +56,7 @@ def log_action(verbose: bool = False):
                 if log_data.get('currency'):
                     log_message_parts.append(f'currency="{log_data['currency']}"')
                     
-                amount_val = log_data.get('amount')
-                if log_data.get('amount') is not None:
-                    try:
-                        amount_float = float(amount_val)
-                        log_message_parts.append(f'amount={log_data['amount']:,.4f}')
-                    except (ValueError, TypeError):
-                        log_message_parts.append(f"amount='{amount_val}'")
+                
                 log_message_parts.append(f"result={log_data['result']}")
                 if log_data['result'] == 'ERROR':
                     log_message_parts.append(f'error="{log_data['error_type']}: {log_data['error_message']}"')
@@ -75,4 +69,3 @@ def log_action(verbose: bool = False):
 
         return wrapper
     return decorator
-

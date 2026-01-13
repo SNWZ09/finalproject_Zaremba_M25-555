@@ -1,10 +1,11 @@
 #импорт для логирования
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+from logging.handlers import RotatingFileHandler
 
 #импорт SettingsLoader
 from valutatrade_hub.infra.settings import settings_loader
+
 
 #настраиваем логгер
 def setup_logging():
