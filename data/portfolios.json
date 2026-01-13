@@ -8,6 +8,9 @@
         "wallets": {
             "USD": {
                 "balance": 49.0
+            },
+            "BTC": {
+                "balance": 0.0
             }
         }
     }

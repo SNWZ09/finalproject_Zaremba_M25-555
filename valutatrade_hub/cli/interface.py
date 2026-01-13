@@ -1,5 +1,8 @@
 import shlex
 
+#импорт логгера
+import logging
+
 #импортируем нашу функцию с бизнес-логикой
 from valutatrade_hub.core.usecases import(
     register_user, 
@@ -19,9 +22,13 @@ def main():
 
     #запуск логирования
     setup_logging()
+    
+    cli_logger = logging.getLogger(__name__)
+    cli_logger.info('Приложение запущено.')
 
-    print("Вы находитесь в ValutaTrade HUB!")
-    print("Доступные команды: register, login, show-portfolio, buy, sell, get-rate, exit")
+
+    print('Вы находитесь в ValutaTrade HUB!')
+    print('Доступные команды: register, login, show-portfolio, buy, sell, get-rate, exit')
     
     current_user_session = None
     
@@ -34,20 +41,15 @@ def main():
         #разделяем на части
         try:
             command_parts = shlex.split(raw_command)
-            if not command_parts:
-                continue
-                
-            main_command = command_parts[0]
+
+            #разделяем команду и аргументыф
+            main_command = command_parts[0].lower()
             args = command_parts[1:]
 
             #если ввели пустую строку - ничего не делаем
             if not command_parts:
                 continue
 
-            #разделяем команду и аргументыф
-            main_command = command_parts[0]
-            args = command_parts[1:]
-        
             if main_command == 'exit':
                 print('До свидания')
                 break
