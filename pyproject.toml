@@ -38,3 +38,18 @@ ignore = []
 dev = [
     "ruff (>=0.14.11,<0.15.0)"
 ]
+
+[tool.valutatrade]
+#секция для конфигурации проекта
+
+data_path = 'data'
+users_filename = 'users.json'
+portfolios_filename = 'portfolios.json'
+rates_filename = 'rates.json'
+
+#настраиваем, сколько будет жить кэш курсов (в сек)
+rates_ttl_seconds = 300  
+
+#логирование (ии, извините, сложная для понимания тема)
+log_file_path = 'logs/app.log'
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

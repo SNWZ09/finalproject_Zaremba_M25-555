@@ -3,21 +3,28 @@ import os
 import time
 from datetime import datetime
 
-#импортируем ранее созданные функции и константы
-from .utils import read_json, write_json, USERS_FILE_PATH, PORTFOLIOS_FILE_PATH, RATES_FILE_PATH
-
-#импортируем сделанные исключения
-from .exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
+#импортируем SettingsLoader
+from valutatrade_hub.infra.settings import settings_loader
+from .utils import read_json, write_json
 
 #регистрация пользователя
 def register_user(username, password):
+
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    users_filename = settings_loader.get("users_filename", "users.json")
+    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
+
+    users_file_path = os.path.join(data_path, users_filename)
+    portfolios_file_path = os.path.join(data_path, portfolios_filename)
 
     #проверяем длину пароля
     if len(password) < 4:
         return 'Ошибка: Пароль должен быть не короче 4 символов'
 
     #читаем то, что уже есть в файле
-    users = read_json(USERS_FILE_PATH)
+    users = read_json(users_file_path)
 
     #проверяем уникальность
     for user in users:
@@ -45,16 +52,16 @@ def register_user(username, password):
 
     #сохраняем и записываем в файл
     users.append(new_user)
-    write_json(USERS_FILE_PATH, users)
+    write_json(users_file_path, users)
 
     #создаем ему портфель
-    portfolios = read_json(PORTFOLIOS_FILE_PATH)
+    portfolios = read_json(portfolios_file_path)
     new_portfolio = {
         'user_id': new_user_id,
         'wallets': {}
     }
     portfolios.append(new_portfolio)
-    write_json(PORTFOLIOS_FILE_PATH, portfolios)
+    write_json(portfolios_file_path, portfolios)
 
     #возвращаем сообщение о том, что всё получилось
     return f'Пользователь "{username}" зарегистрирован (id={new_user_id}). Войдите: login --username {username} --password ****'
@@ -62,8 +69,14 @@ def register_user(username, password):
 #вход пользователя
 def login_user(username, password):
 
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    users_filename = settings_loader.get("users_filename", "users.json")
+    users_file_path = os.path.join(data_path, users_filename)
+
     #читаем файл и ищем пользователя по имени
-    users = read_json(USERS_FILE_PATH)
+    users = read_json(users_file_path)
     user_to_login = None
     for user_data in users:
     
@@ -92,10 +105,18 @@ def login_user(username, password):
 #смотрим портфолио
 def show_portfolio(user_id, username, base_currency='USD'):
 
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
+    rates_filename = settings_loader.get("rates_filename", "rates.json")
+    portfolios_file_path = os.path.join(data_path, portfolios_filename)
+    rates_file_path = os.path.join(data_path, rates_filename)
+
     #читаем нужные файлы
     base_currency = base_currency.upper()
-    portfolios = read_json(PORTFOLIOS_FILE_PATH)
-    rates_data = read_json(RATES_FILE_PATH, default_data={})
+    portfolios = read_json(portfolios_file_path)
+    rates_data = read_json(rates_file_path, default_data={})
     
     #создаем словарь с курсами относительно (доллара)
     exchange_rates = { 'USD': 1.0 }
@@ -154,6 +175,14 @@ def show_portfolio(user_id, username, base_currency='USD'):
 #покупаем валюту
 def buy_currency(user_id, currency_to_buy, amount):
 
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
+    rates_filename = settings_loader.get("rates_filename", "rates.json")
+    portfolios_file_path = os.path.join(data_path, portfolios_filename)
+    rates_file_path = os.path.join(data_path, rates_filename)
+
     #приводим к унифицированному виду валюту
     currency_to_buy = currency_to_buy.upper()
     try:
@@ -165,8 +194,8 @@ def buy_currency(user_id, currency_to_buy, amount):
         return 'Ошибка: "amount" должен быть числом'
 
     #читаем данные
-    portfolios = read_json(PORTFOLIOS_FILE_PATH)
-    rates_data = read_json(RATES_FILE_PATH, default_data={})
+    portfolios = read_json(portfolios_file_path)
+    rates_data = read_json(rates_file_path, default_data={})
     
     #получаем курс
     exchange_rates = { 'USD': 1.0 }
@@ -201,7 +230,7 @@ def buy_currency(user_id, currency_to_buy, amount):
     }
     
     #сохраняем
-    write_json(PORTFOLIOS_FILE_PATH, portfolios)
+    write_json(portfolios_file_path, portfolios)
     new_balance = old_balance + amount
     purchase_cost = amount * current_rate
     
@@ -217,6 +246,14 @@ def buy_currency(user_id, currency_to_buy, amount):
 #продаем валюту
 def sell_currency(user_id, currency_to_sell, amount):
 
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
+    rates_filename = settings_loader.get("rates_filename", "rates.json")
+    portfolios_file_path = os.path.join(data_path, portfolios_filename)
+    rates_file_path = os.path.join(data_path, rates_filename)
+
     #приводим к унифицированному виду валюту
     currency_to_sell = currency_to_sell.upper()
     
@@ -228,8 +265,8 @@ def sell_currency(user_id, currency_to_sell, amount):
         return 'Ошибка: "amount" должен быть числом'
 
     #читаем данные
-    portfolios = read_json(PORTFOLIOS_FILE_PATH)
-    rates_data = read_json(RATES_FILE_PATH, default_data={})
+    portfolios = read_json(portfolios_file_path)
+    rates_data = read_json(rates_file_path, default_data={})
 
     #получаем курсы валют
     exchange_rates = { 'USD': 1.0 }
@@ -281,7 +318,7 @@ def sell_currency(user_id, currency_to_sell, amount):
     
     #сохраняем
     portfolios[portfolio_index] = user_portfolio
-    write_json(PORTFOLIOS_FILE_PATH, portfolios)
+    write_json(portfolios_file_path, portfolios)
     
     #выводим
     report = (
@@ -297,8 +334,34 @@ def sell_currency(user_id, currency_to_sell, amount):
 #получаем курсы по обмену валют
 def get_exchange_rate(from_currency, to_currency):
 
-    from_curr_obj = get_currency(from_currency)
-    to_curr_obj = get_currency(to_currency)
+    #теперь получаем пути не из констант
+    #как было раньше
+    data_path = settings_loader.get("data_path", "data")
+    rates_filename = settings_loader.get("rates_filename", "rates.json")
+    rates_file_path = os.path.join(data_path, rates_filename)
+
+    from_currency = from_currency.upper()
+    to_currency = to_currency.upper()
+    
+    if from_currency == to_currency:
+        return f'Курс {from_currency}→{to_currency}: 1.0'
+
+    #читаем данные
+    rates_data = read_json(rates_file_path, default_data={})
+    
+    #создаем словарь по отношению к доллару
+    exchange_rates_to_usd = {'USD': 1.0}
+    for key, value in rates_data.get('rates', {}).items():
+        currency_code = key.split('_')[0]
+        exchange_rates_to_usd[currency_code] = value['rate']
+
+    #проверяем, есть ли такой курс в словаре
+    if from_currency not in exchange_rates_to_usd:
+        # Если курса нет, выбрасываем ошибку, как будто API его не предоставил.
+        raise ApiRequestError(f"Курс для '{from_currency}' недоступен.")
+    if to_currency not in exchange_rates_to_usd:
+        raise ApiRequestError(f"Курс для '{to_currency}' недоступен.")
+        
         
     #рассчитываем "перекрестные" курсы (или как их назвать..)    
     from_rate_vs_usd = exchange_rates_to_usd[from_currency]
