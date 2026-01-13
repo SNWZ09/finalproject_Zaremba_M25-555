@@ -10,10 +10,15 @@ from valutatrade_hub.core.usecases import(
     get_exchange_rate
 )
 
+from valutatrade_hub.logging_config import setup_logging
+
 #импортируем сделанные исключения
 from ..core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
 
 def main():
+
+    #запуск логирования
+    setup_logging()
 
     print("Вы находитесь в ValutaTrade HUB!")
     print("Доступные команды: register, login, show-portfolio, buy, sell, get-rate, exit")
@@ -222,8 +227,6 @@ def main():
             print(f'Ошибка операции: {e}')
         except CurrencyNotFoundError as e:
             print(f'Ошибка валюты: {e}')
-        except PortfolioError as e:
-            print(f'Ошибка портфеля: {e}')
         except ApiRequestError as e:
             print(f'Сетевая ошибка: {e}')
         except Exception as e:

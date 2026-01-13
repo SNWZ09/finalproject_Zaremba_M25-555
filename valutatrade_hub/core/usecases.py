@@ -3,11 +3,24 @@ import os
 import time
 from datetime import datetime
 
-#импортируем SettingsLoader
+#импорт SettingsLoader
 from valutatrade_hub.infra.settings import settings_loader
+
+#импорт декоратора
+from valutatrade_hub.decorators import log_action
 from .utils import read_json, write_json
 
+from .currencies import get_currency
+from .models import Portfolio
+
+from .exceptions import (
+    InsufficientFundsError,
+    CurrencyNotFoundError,
+    ApiRequestError
+)
+
 #регистрация пользователя
+@log_action()
 def register_user(username, password):
 
     #теперь получаем пути не из констант
@@ -67,6 +80,7 @@ def register_user(username, password):
     return f'Пользователь "{username}" зарегистрирован (id={new_user_id}). Войдите: login --username {username} --password ****'
 
 #вход пользователя
+@log_action()
 def login_user(username, password):
 
     #теперь получаем пути не из констант
@@ -173,77 +187,62 @@ def show_portfolio(user_id, username, base_currency='USD'):
     
 
 #покупаем валюту
+@log_action()
 def buy_currency(user_id, currency_to_buy, amount):
 
-    #теперь получаем пути не из констант
-    #как было раньше
-    data_path = settings_loader.get("data_path", "data")
-    portfolios_filename = settings_loader.get("portfolios_filename", "portfolios.json")
-    rates_filename = settings_loader.get("rates_filename", "rates.json")
-    portfolios_file_path = os.path.join(data_path, portfolios_filename)
-    rates_file_path = os.path.join(data_path, rates_filename)
-
-    #приводим к унифицированному виду валюту
-    currency_to_buy = currency_to_buy.upper()
+    #смотрим валюту через наше хранилище
+    currency_obj = get_currency(currency_to_buy)
+    
     try:
-        #преобразовываем amount в float + проверка, что оно > 0
         amount = float(amount)
         if amount <= 0:
-            return 'Ошибка: "amount" должен быть положительным числом'
+            raise ValueError
     except (ValueError, TypeError):
-        return 'Ошибка: "amount" должен быть числом'
+        raise ValueError('"amount" должен быть положительным числом')
 
-    #читаем данные
+    #получаем пути
+    data_path = settings_loader.get('data_path', 'data')
+    portfolios_file_path = os.path.join(data_path, settings_loader.get('portfolios_filename'))
     portfolios = read_json(portfolios_file_path)
-    rates_data = read_json(rates_file_path, default_data={})
-    
-    #получаем курс
-    exchange_rates = { 'USD': 1.0 }
-    for key, value in rates_data.get('rates', {}).items():
-        currency_code = key.split('_')[0]
-        exchange_rates[currency_code] = value['rate']
-    
-    current_rate = exchange_rates.get(currency_to_buy)
-    
-    #если в курсах нет валюты - её не купить
-    if not current_rate:
-        return f'Ошибка: Не удалось получить курс для {currency_to_buy} → USD'
-        
-    #обновляем портфель
-    user_portfolio = None
-    for p in portfolios:
-        if p['user_id'] == user_id:
-            user_portfolio = p
+
+    #ищем портфель
+    user_portfolio_dict = None
+    portfolio_index = -1
+    for i, p in enumerate(portfolios):
+        if p.get('user_id') == user_id:
+            user_portfolio_dict = p
+            portfolio_index = i
             break
     
-    #если произошла какая-то фатальная ошибка
-    #и регистрация сработала, но портфель не найден
-    #выводим ошибку
-    if not user_portfolio:
-        return 'Ошибка: портфель пользователя не найден.'
+    if not user_portfolio_dict:
+        raise 'ошибка: портфель пользователя не найден.'
+    portfolio_obj = Portfolio(user_id, user_portfolio_dict['wallets'])
+    
+    #получаем (или создаем) кошелек
+    wallet_obj = portfolio_obj.get_wallet(currency_obj.code)
+    if not wallet_obj:
+        portfolio_obj.add_currency(currency_obj.code)
+        wallet_obj = portfolio_obj.get_wallet(currency_obj.code)
+    
+    old_balance = wallet_obj.balance
+    
+    wallet_obj.deposit(amount)
+    new_balance = wallet_obj.balance
 
-    old_balance = user_portfolio['wallets'].get(currency_to_buy, {}).get('balance', 0.0)
-    
-    #обновляем или создаем кошелек
-    user_portfolio['wallets'][currency_to_buy] = {
-        'balance': old_balance + amount
-    }
-    
-    #сохраняем
+    #сохраняем покупку и выводим
+    updated_wallets_dict = {code: {'balance': wallet.balance} for code, wallet in portfolio_obj.wallets.items()}
+    portfolios[portfolio_index]['wallets'] = updated_wallets_dict
     write_json(portfolios_file_path, portfolios)
-    new_balance = old_balance + amount
-    purchase_cost = amount * current_rate
-    
+
     report = (
-        f"Покупка выполнена: {amount:,.4f} {currency_to_buy} по курсу {current_rate:,.2f} USD/{currency_to_buy}\n"
+        f"Покупка выполнена: {amount:,.4f} {currency_obj.code}\n"
         f"Изменения в портфеле:\n"
-        f"- {currency_to_buy}: было {old_balance:,.4f} → стало {new_balance:,.4f}\n"
-        f"Оценочная стоимость покупки: {purchase_cost:,.2f} USD"
+        f"- {currency_obj.code}: было {old_balance:,.4f} → стало {new_balance:,.4f}"
     )
-    
     return report
     
 #продаем валюту
+@log_action()
 def sell_currency(user_id, currency_to_sell, amount):
 
     #теперь получаем пути не из констант
